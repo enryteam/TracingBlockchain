@@ -1,0 +1,152 @@
+溯源合约
+
+pragma solidity ^0.4.20;
+contract Trace {
+    enum State { Origin, Factory, QA, Shipping, Received, Pending }
+    string name;
+    uint price;
+    uint weight;
+    bool lock = false;	//合约锁
+    bool close = false;	//合约状态
+    uint number = 1;
+    uint attr_number = 1;
+    
+    mapping (address  => string) guestbook; //客户留言本	
+
+	struct Attribute {
+	    address owner;	// 供应商
+        string name;		// 属性的名字
+        string date;    	// 生产日期
+        string desc;		// 描述信息
+        
+    }
+    mapping (uint  => Attribute) attribute;
+
+    struct Logistics {
+        address owner;	// 中转站
+        string date;    // 转运日期
+        State status;   // 状态
+        string message; // 留言信息
+    }
+    mapping (uint  => Logistics) stations;
+    
+    function Trace(string _name, uint _price, uint _weight) public {
+        name = _name;
+        price = _price;
+        weight = _weight;
+	}
+    // 名称
+    function getName() public view returns(string){
+        return name;
+    }
+    // 价格
+    function getPrice() public view returns(uint){
+        return price;
+    }
+    // 重量
+    function getWeight() public view returns(uint){
+        return weight;
+    }
+    
+     // 增加商品属性
+    function putAttribute(address _owner,string _name, string _date, string _desc ) public{
+        if(lock == false){
+        		Attribute memory item = Attribute(_owner, _name,_date,_desc);
+        		attribute[attr_number] = item;
+        		attr_number = attr_number + 1;
+        }
+    }
+
+	// 获得属性
+    function getAttribute(uint _attr_number) public view returns(address, string, string, string) {
+        require(_attr_number < attr_number);
+        Attribute memory item = attribute[_attr_number];
+        
+		return (item.owner, item.name, item.date, item.desc);
+	}
+    
+    // 增加物流中转信息
+    function putLogistics(address _owner,string _date, State _status, string _message ) public{
+        if(close == false){
+            Logistics memory node = Logistics(_owner,_date,_status,_message);
+            stations[number] = node;
+            number = number + 1;
+            lock = true;
+        }
+        if (_status == State.Received) {
+            close = true;
+        }
+    }
+
+	// 获得中转信息
+    function getLogistics(uint _number) public view returns(address, string, State, string) {
+        require(_number < number);
+
+        Logistics memory node = stations[_number];
+        
+		return (node.owner, node.date, node.status, node.message);
+	}
+	
+	// 或者转中站数量
+	function getLogisticsCount() public view returns(uint){
+	    return number;
+	}
+    
+    // 客户留言
+    	function addGuestbook(address _owner, string message) public{
+	    guestbook[_owner] = message;
+	}
+}		
+合约部署，需要输入三个参数，分别是名称，价格和装量
+
+		Trace(string _name, uint _price, uint _weight) 	
+产品属性可以在出厂前设置，一旦出厂进入物流阶段就不允许在更改了。
+
+应用场景一
+调用合约案例一，这是没有经过深加工的原产品案例。例如 Trace("山羊肉", 25, 50) 
+
+var contract;
+Trace.deployed().then(function(instance){contract=instance;});
+contract.getName();
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","颜色", "", "黑色")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","产地", "", "内蒙古")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","出生", "2017-01-12", "XXX牧场")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","宰杀", "2018-02-12", "XXX宰杀")
+
+contract.putLogistics("0x627306090abab3a6e1400e9345bc60c78a8bef57","2018-02-20",0,"XXX牧场");
+contract.putLogistics("0x627306090abab3a6e1400e9345bc60c78a8bef57","2018-02-20",1,"XXX屠宰公司");
+contract.putLogistics("0xc5fdf4076b8f3a5357c5e395ab970b5b54098fef","2018-02-22",2,"XXX检验检疫");
+contract.putLogistics("0xf17f52151ebef6c7334fad080c5704d77216b732","2018-02-21",3,"XXX一级经销商");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-23",3,"XXX二级经销商");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-24",3,"XXX批发中心");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-25",3,"XXX超市");
+contract.putLogistics("0x0d1d4e623d10f9fba5db95830f7d3839406c6af2","2018-02-26",4,"用户包裹收到");
+
+contract.getNode(); // 获得物流经过的转运站数量		
+应用场景二
+调用合约案例二，这是深加工的产品案例。例如 Trace("牦牛肉干", 80, 500) 
+
+		var contract;
+Trace.deployed().then(function(instance){contract=instance;});
+contract.getName();
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","调和油", "2016-10-10", "银龙鱼牌")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","辣椒粉", "2016-10-30", "西藏XXX公司生产")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","生抽", "2016-01-12", "XXX生抽，XXX生产")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","山梨酸钾", "2017-02-12", "XXX生产")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","防腐剂", "2017-02-12", "XXX生产")
+contract.putAttribute("0x627306090abab3a6e1400e9345bc60c78a8bef57","牦牛肉", "2017-02-12", "XXX牧场")
+
+contract.putLogistics("0x627306090abab3a6e1400e9345bc60c78a8bef57","2018-02-20",0,"XXX牧场");
+contract.putLogistics("0x627306090abab3a6e1400e9345bc60c78a8bef57","2018-02-20",1,"XXX公司生产");
+contract.putLogistics("0xc5fdf4076b8f3a5357c5e395ab970b5b54098fef","2018-02-22",2,"XXX通过QA、QC");
+contract.putLogistics("0xf17f52151ebef6c7334fad080c5704d77216b732","2018-02-21",3,"XXX一级经销商");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-23",3,"XXX二级经销商");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-24",3,"XXX批发中心");
+contract.putLogistics("0x821aea9a577a9b44299b9c15c88cf3087f3b5544","2018-02-25",3,"XXX超市");
+contract.putLogistics("0x0d1d4e623d10f9fba5db95830f7d3839406c6af2","2018-02-26",4,"用户包裹收到");
+
+contract.getNode(); // 获得物流经过的转运站数量		
+用户留言
+contract.addGuestbook("0x0d1d423e623d10f9d10f9d10f9d10f9d10f9fba5","东西好吃，下次还买，给好评");		
+合约代码的测试
+TODO://
